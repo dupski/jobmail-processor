@@ -1,10 +1,14 @@
 import { google } from "googleapis";
 import { authorize } from "./auth";
+import { extractJobListings, EmailData, JobListing } from "./openai";
 import * as fs from "fs";
 import * as path from "path";
 
 interface Config {
   emailSenders: string[];
+  openaiApiKey: string;
+  openaiModel: string;
+  batchSize: number;
 }
 
 function loadConfig(): Config {
@@ -22,6 +26,32 @@ function loadConfig(): Config {
 function buildGmailQuery(senders: string[]): string {
   const senderQuery = senders.map((email) => `from:${email}`).join(" OR ");
   return `in:inbox AND (${senderQuery})`;
+}
+
+/**
+ * Extract HTML content from email payload
+ */
+function getEmailHtmlContent(payload: any): string {
+  // Check if the body has data directly
+  if (payload.body?.data) {
+    return Buffer.from(payload.body.data, "base64").toString("utf-8");
+  }
+
+  // Check parts for HTML content
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/html" && part.body?.data) {
+        return Buffer.from(part.body.data, "base64").toString("utf-8");
+      }
+      // Recursively check nested parts
+      if (part.parts) {
+        const html = getEmailHtmlContent(part);
+        if (html) return html;
+      }
+    }
+  }
+
+  return "";
 }
 
 async function listJobEmails() {
@@ -42,7 +72,7 @@ async function listJobEmails() {
     const response = await gmail.users.messages.list({
       userId: "me",
       q: gmailQuery,
-      maxResults: 50, // Adjust as needed
+      maxResults: 100, // Get more emails to process
     });
 
     const messages = response.data.messages;
@@ -52,16 +82,18 @@ async function listJobEmails() {
       return;
     }
 
-    console.log(`Found ${messages.length} matching emails:\n`);
+    console.log(`Found ${messages.length} matching emails`);
     console.log("=".repeat(80));
 
-    // Fetch details for each message to get the subject
+    // Fetch full content for each message
+    console.log("\nFetching email contents...");
+    const emailData: EmailData[] = [];
+
     for (const message of messages) {
       const msg = await gmail.users.messages.get({
         userId: "me",
         id: message.id!,
-        format: "metadata",
-        metadataHeaders: ["Subject", "From", "Date"],
+        format: "full", // Get full message including body
       });
 
       const headers = msg.data.payload?.headers || [];
@@ -69,14 +101,59 @@ async function listJobEmails() {
         headers.find((h) => h.name === "Subject")?.value || "(No Subject)";
       const from = headers.find((h) => h.name === "From")?.value || "(Unknown)";
       const date = headers.find((h) => h.name === "Date")?.value || "(No Date)";
+      const htmlContent = getEmailHtmlContent(msg.data.payload);
 
-      console.log(`Subject: ${subject}`);
-      console.log(`From: ${from}`);
-      console.log(`Date: ${date}`);
-      console.log("-".repeat(80));
+      emailData.push({
+        from,
+        subject,
+        date,
+        htmlContent,
+      });
+
+      process.stdout.write(".");
     }
 
-    console.log(`\nTotal: ${messages.length} emails`);
+    console.log(`\n\nFetched ${emailData.length} emails`);
+    console.log("=".repeat(80));
+
+    // Process emails in batches
+    const allJobListings: JobListing[] = [];
+    const batchSize = config.batchSize || 20;
+
+    for (let i = 0; i < emailData.length; i += batchSize) {
+      const batch = emailData.slice(i, i + batchSize);
+      const batchNum = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(emailData.length / batchSize);
+
+      console.log(
+        `\nProcessing batch ${batchNum}/${totalBatches} (${batch.length} emails)...`
+      );
+
+      const jobs = await extractJobListings(
+        batch,
+        config.openaiApiKey,
+        config.openaiModel
+      );
+
+      allJobListings.push(...jobs);
+      console.log(`Found ${jobs.length} job listings in this batch`);
+    }
+
+    // Display results
+    console.log("\n" + "=".repeat(80));
+    console.log(`TOTAL JOB LISTINGS FOUND: ${allJobListings.length}`);
+    console.log("=".repeat(80) + "\n");
+
+    allJobListings.forEach((job, index) => {
+      console.log(`${index + 1}. ${job.jobTitle}`);
+      console.log(`   Link: ${job.jobLink}`);
+      console.log(`   From: ${job.emailFrom}`);
+      console.log(`   Email Subject: ${job.emailSubject}`);
+      console.log(`   Date: ${job.emailDate}`);
+      console.log("-".repeat(80));
+    });
+
+    console.log(`\nTotal: ${allJobListings.length} job listings extracted`);
   } catch (error) {
     console.error("Error:", error instanceof Error ? error.message : error);
     process.exit(1);

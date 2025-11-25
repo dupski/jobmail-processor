@@ -16,7 +16,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "googleapis": "^128.0.0"
+    "googleapis": "^128.0.0",
+    "openai": "^6.9.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
