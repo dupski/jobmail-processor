@@ -70,6 +70,11 @@ The application:
 - `credentials.json` - Your Google OAuth credentials (gitignored, you must create this)
 - `token.json` - Stored OAuth token (gitignored, auto-generated on first run)
 
+## Resources
+
+- [Google Cloud Console](https://console.cloud.google.com/)
+- [OpenAI Platform Site](https://platform.openai.com/)
+
 ## Next Steps
 
 Future enhancements will include:
