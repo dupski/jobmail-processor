@@ -2,5 +2,5 @@
   "emailSenders": ["info@jobs.totaljobsmail.com", "jobs-listings@linkedin.com"],
   "openaiApiKey": "YOUR_OPENAI_API_KEY_HERE",
   "openaiModel": "gpt-5-nano",
-  "batchSize": 20
+  "batchSize": 10
 }

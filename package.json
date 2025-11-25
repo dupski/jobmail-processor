@@ -16,8 +16,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/turndown": "^5.0.6",
     "googleapis": "^128.0.0",
-    "openai": "^6.9.1"
+    "openai": "^6.9.1",
+    "tiktoken": "^1.0.22",
+    "turndown": "^7.2.2"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

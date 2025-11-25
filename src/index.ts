@@ -1,6 +1,12 @@
 import { google } from "googleapis";
 import { authorize } from "./auth";
-import { extractJobListings, EmailData, JobListing } from "./openai";
+import {
+  extractJobListings,
+  EmailData,
+  JobListing,
+  calculateOptimalBatchSize,
+} from "./openai";
+import TurndownService from "turndown";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -88,6 +94,10 @@ async function listJobEmails() {
     // Fetch full content for each message
     console.log("\nFetching email contents...");
     const emailData: EmailData[] = [];
+    const turndownService = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+    });
 
     for (const message of messages) {
       const msg = await gmail.users.messages.get({
@@ -103,11 +113,19 @@ async function listJobEmails() {
       const date = headers.find((h) => h.name === "Date")?.value || "(No Date)";
       const htmlContent = getEmailHtmlContent(msg.data.payload);
 
+      // Convert HTML to Markdown to reduce token usage
+      let markdownContent = "";
+      if (htmlContent) {
+        markdownContent = turndownService.turndown(htmlContent);
+      } else {
+        console.warn(`\nWarning: No HTML content found for email: ${subject}`);
+      }
+
       emailData.push({
         from,
         subject,
         date,
-        htmlContent,
+        content: markdownContent,
       });
 
       process.stdout.write(".");
@@ -116,9 +134,17 @@ async function listJobEmails() {
     console.log(`\n\nFetched ${emailData.length} emails`);
     console.log("=".repeat(80));
 
+    // Calculate optimal batch size based on email sizes and model limits
+    const configBatchSize = config.batchSize || 20;
+    const optimalBatchSize = calculateOptimalBatchSize(
+      emailData,
+      config.openaiModel,
+      configBatchSize
+    );
+
     // Process emails in batches
     const allJobListings: JobListing[] = [];
-    const batchSize = config.batchSize || 20;
+    const batchSize = optimalBatchSize;
 
     for (let i = 0; i < emailData.length; i += batchSize) {
       const batch = emailData.slice(i, i + batchSize);
