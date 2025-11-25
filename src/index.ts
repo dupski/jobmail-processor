@@ -1,11 +1,6 @@
 import { google } from "googleapis";
 import { authorize } from "./auth";
-import {
-  extractJobListings,
-  EmailData,
-  JobListing,
-  calculateOptimalBatchSize,
-} from "./openai";
+import { extractJobListings, EmailData, JobListing } from "./openai";
 import TurndownService from "turndown";
 import * as fs from "fs";
 import * as path from "path";
@@ -14,7 +9,7 @@ interface Config {
   emailSenders: string[];
   openaiApiKey: string;
   openaiModel: string;
-  batchSize: number;
+  delayBetweenRequests: number;
 }
 
 function loadConfig(): Config {
@@ -134,35 +129,46 @@ async function listJobEmails() {
     console.log(`\n\nFetched ${emailData.length} emails`);
     console.log("=".repeat(80));
 
-    // Calculate optimal batch size based on email sizes and model limits
-    const configBatchSize = config.batchSize || 20;
-    const optimalBatchSize = calculateOptimalBatchSize(
-      emailData,
-      config.openaiModel,
-      configBatchSize
-    );
+    // Process emails one by one
+    console.log(`\nProcessing ${emailData.length} emails with ChatGPT...`);
+    console.log(`Model: ${config.openaiModel}`);
+    console.log(`Delay between requests: ${config.delayBetweenRequests}ms\n`);
 
-    // Process emails in batches
     const allJobListings: JobListing[] = [];
-    const batchSize = optimalBatchSize;
 
-    for (let i = 0; i < emailData.length; i += batchSize) {
-      const batch = emailData.slice(i, i + batchSize);
-      const batchNum = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(emailData.length / batchSize);
+    for (let i = 0; i < emailData.length; i++) {
+      const email = emailData[i];
+      const emailNum = i + 1;
 
       console.log(
-        `\nProcessing batch ${batchNum}/${totalBatches} (${batch.length} emails)...`
+        `[${emailNum}/${
+          emailData.length
+        }] Processing: ${email.subject.substring(0, 60)}...`
       );
 
-      const jobs = await extractJobListings(
-        batch,
-        config.openaiApiKey,
-        config.openaiModel
-      );
+      try {
+        const jobs = await extractJobListings(
+          email,
+          config.openaiApiKey,
+          config.openaiModel
+        );
 
-      allJobListings.push(...jobs);
-      console.log(`Found ${jobs.length} job listings in this batch`);
+        allJobListings.push(...jobs);
+        console.log(`  ✓ Found ${jobs.length} job(s)\n`);
+
+        // Delay before next request (except for the last one)
+        if (i < emailData.length - 1 && config.delayBetweenRequests > 0) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, config.delayBetweenRequests)
+          );
+        }
+      } catch (error) {
+        console.error(
+          `  ✗ Error processing email: ${
+            error instanceof Error ? error.message : error
+          }\n`
+        );
+      }
     }
 
     // Display results
