@@ -4,14 +4,14 @@
       "emailSender": "info@jobs.totaljobsmail.com",
       "jobLinkPatterns": ["https://click.totaljobsmail.com/*"],
       "followJobLink": true,
-      "linkSelector": "//a",
-      "linkTextExclusions": ["unsubscribe", "view in browser", "privacy policy", "manage preferences"]
+      "linkSelector": "//strong/parent::a",
+      "linkTextExclusions": ["unsubscribe", "view in browser", "privacy policy", "manage preferences", "contact us"]
     },
     {
       "emailSender": "jobs-listings@linkedin.com",
       "jobLinkPatterns": ["https://www.linkedin.com/comm/*", "https://linkedin.com/jobs/*"],
       "followJobLink": true,
-      "linkSelector": "//a",
+      "linkSelector": "//strong/parent::a",
       "linkTextExclusions": ["unsubscribe", "settings", "help", "privacy"]
     }
   ],
