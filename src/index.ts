@@ -5,6 +5,10 @@ import TurndownService from "turndown";
 import * as fs from "fs";
 import * as path from "path";
 
+// Parse command-line arguments
+const args = process.argv.slice(2);
+const debugPromptsMode = args.includes("--debug-prompts");
+
 interface Config {
   emailSenders: string[];
   openaiApiKey: string;
@@ -130,9 +134,15 @@ async function listJobEmails() {
     console.log("=".repeat(80));
 
     // Process emails one by one
-    console.log(`\nProcessing ${emailData.length} emails with ChatGPT...`);
-    console.log(`Model: ${config.openaiModel}`);
-    console.log(`Delay between requests: ${config.delayBetweenRequests}ms\n`);
+    if (debugPromptsMode) {
+      console.log(`\n🔍 DEBUG MODE: Generating prompts without calling OpenAI...`);
+      console.log(`Model configured: ${config.openaiModel}`);
+      console.log(`Prompts will be saved to: debug-prompts/\n`);
+    } else {
+      console.log(`\nProcessing ${emailData.length} emails with ChatGPT...`);
+      console.log(`Model: ${config.openaiModel}`);
+      console.log(`Delay between requests: ${config.delayBetweenRequests}ms\n`);
+    }
 
     const allJobListings: JobListing[] = [];
 
@@ -150,14 +160,17 @@ async function listJobEmails() {
         const jobs = await extractJobListings(
           email,
           config.openaiApiKey,
-          config.openaiModel
+          config.openaiModel,
+          debugPromptsMode
         );
 
         allJobListings.push(...jobs);
-        console.log(`  ✓ Found ${jobs.length} job(s)\n`);
+        if (!debugPromptsMode) {
+          console.log(`  ✓ Found ${jobs.length} job(s)\n`);
+        }
 
         // Delay before next request (except for the last one)
-        if (i < emailData.length - 1 && config.delayBetweenRequests > 0) {
+        if (!debugPromptsMode && i < emailData.length - 1 && config.delayBetweenRequests > 0) {
           await new Promise((resolve) =>
             setTimeout(resolve, config.delayBetweenRequests)
           );
@@ -173,6 +186,14 @@ async function listJobEmails() {
 
     // Display results
     console.log("\n" + "=".repeat(80));
+    if (debugPromptsMode) {
+      console.log(`DEBUG MODE COMPLETE`);
+      console.log("=".repeat(80));
+      console.log(`\n✓ Generated ${emailData.length} prompt file(s) in debug-prompts/`);
+      console.log(`\nTo run normally (with OpenAI API calls), use: npm start`);
+      console.log(`To debug prompts again, use: npm start -- --debug-prompts\n`);
+      return;
+    }
     console.log(`TOTAL JOB LISTINGS FOUND: ${allJobListings.length}`);
     console.log("=".repeat(80) + "\n");
 
