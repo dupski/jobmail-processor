@@ -1,6 +1,19 @@
 {
-  "emailSenders": ["info@jobs.totaljobsmail.com", "jobs-listings@linkedin.com"],
-  "openaiApiKey": "YOUR_OPENAI_API_KEY_HERE",
-  "openaiModel": "gpt-5-nano",
-  "delayBetweenRequests": 1000
+  "jobEmailSources": [
+    {
+      "emailSender": "info@jobs.totaljobsmail.com",
+      "jobLinkPatterns": ["https://click.totaljobsmail.com/*"],
+      "followJobLink": true,
+      "linkSelector": "//a",
+      "linkTextExclusions": ["unsubscribe", "view in browser", "privacy policy", "manage preferences"]
+    },
+    {
+      "emailSender": "jobs-listings@linkedin.com",
+      "jobLinkPatterns": ["https://www.linkedin.com/comm/*", "https://linkedin.com/jobs/*"],
+      "followJobLink": true,
+      "linkSelector": "//a",
+      "linkTextExclusions": ["unsubscribe", "settings", "help", "privacy"]
+    }
+  ],
+  "delayBetweenRequests": 100
 }

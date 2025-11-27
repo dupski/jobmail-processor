@@ -5,3 +5,4 @@ config.json
 token.json
 *.log
 .DS_Store
+debug-*
